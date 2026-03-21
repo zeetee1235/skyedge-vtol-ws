@@ -13,7 +13,10 @@ vtol:
   landing_descent_altitude: 3.0   # 정밀 착륙 시작 고도 (m)
   max_velocity: 15.0               # 최대 속도 (m/s)
 
-  # GPS 목표 좌표 (대회 현장에서 수정)
+  # GPS 목표 좌표 (향후 GPS → local 변환 로직 연결 예정)
+  # 현재 waypoint_nav_node 는 아래 값을 직접 사용하지 않고,
+  # 노드 내부의 NED local waypoint 예시를 사용합니다.
+  # 초보자는 이 값을 수정해도 현재 비행 경로가 바로 바뀌지 않는다는 점에 주의하세요.
   waypoints:
     - [37.123456, 127.123456, 30.0]
     - [37.234567, 127.234567, 30.0]

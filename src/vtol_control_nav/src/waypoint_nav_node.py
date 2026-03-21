@@ -42,12 +42,12 @@ _PX4_QOS = QoSProfile(
 class WaypointNavNode(Node):
     """PX4 VTOL 웨이포인트 비행 노드 (Offboard 포지션 제어)"""
 
-    _IDLE     = 'IDLE'
-    _ARMING   = 'ARMING'
-    _TAKEOFF  = 'TAKEOFF'
+    _IDLE = 'IDLE'
+    _ARMING = 'ARMING'
+    _TAKEOFF = 'TAKEOFF'
     _NAVIGATE = 'NAVIGATE'
-    _LAND     = 'LAND'
-    _DONE     = 'DONE'
+    _LAND = 'LAND'
+    _DONE = 'DONE'
 
     def __init__(self):
         super().__init__('waypoint_nav_node')
@@ -57,13 +57,13 @@ class WaypointNavNode(Node):
         self.declare_parameter('vtol.takeoff_altitude', 5.0)
         self.declare_parameter('vtol.cruise_altitude', 30.0)
 
-        drone_id    = self.get_parameter('vtol.drone_id').value
+        drone_id = self.get_parameter('vtol.drone_id').value
         takeoff_alt = self.get_parameter('vtol.takeoff_altitude').value
-        cruise_alt  = self.get_parameter('vtol.cruise_altitude').value
+        cruise_alt = self.get_parameter('vtol.cruise_altitude').value
 
         # NED 좌표계: 위쪽이 음수
         self._takeoff_z = -abs(takeoff_alt)
-        self._cruise_z  = -abs(cruise_alt)
+        self._cruise_z = -abs(cruise_alt)
 
         ns = f'/{drone_id}'
 
@@ -99,18 +99,18 @@ class WaypointNavNode(Node):
         )
 
         # ── 상태 변수 ─────────────────────────────────────────────
-        self._status    = VehicleStatus()
+        self._status = VehicleStatus()
         self._local_pos = VehicleLocalPosition()
-        self._state     = self._IDLE
+        self._state = self._IDLE
         self._pre_arm_cnt = 0   # Offboard 모드 전환 전 setpoint 최소 10회 필요
 
         # 웨이포인트 (NED local frame, 미터)
         # 실제 운영 시에는 GPS → local 변환(NavSatFix → LocalPosition) 필요
         self._waypoints: list[tuple[float, float, float]] = [
-            (0.0,   0.0,   self._cruise_z),   # WP0: 이륙 지점 상공
-            (100.0, 0.0,   self._cruise_z),   # WP1
+            (0.0, 0.0, self._cruise_z),   # WP0: 이륙 지점 상공
+            (100.0, 0.0, self._cruise_z),   # WP1
             (100.0, 100.0, self._cruise_z),   # WP2
-            (0.0,   100.0, self._cruise_z),   # WP3
+            (0.0, 100.0, self._cruise_z),   # WP3
         ]
         self._wp_idx = 0
 
@@ -180,16 +180,16 @@ class WaypointNavNode(Node):
 
     def _send_offboard_mode(self) -> None:
         msg = OffboardControlMode()
-        msg.position     = True
-        msg.velocity     = False
+        msg.position = True
+        msg.velocity = False
         msg.acceleration = False
-        msg.timestamp    = self._us_now()
+        msg.timestamp = self._us_now()
         self._pub_offboard.publish(msg)
 
     def _send_setpoint(self, x: float, y: float, z: float, yaw: float = 0.0) -> None:
         msg = TrajectorySetpoint()
-        msg.position  = [x, y, z]
-        msg.yaw       = yaw
+        msg.position = [x, y, z]
+        msg.yaw = yaw
         msg.timestamp = self._us_now()
         self._pub_setpoint.publish(msg)
 
@@ -217,17 +217,17 @@ class WaypointNavNode(Node):
     def _send_cmd(self, command: int, param1: float = 0.0, param2: float = 0.0,
                   param3: float = 0.0, param4: float = 0.0) -> None:
         msg = VehicleCommand()
-        msg.command          = command
-        msg.param1           = param1
-        msg.param2           = param2
-        msg.param3           = param3
-        msg.param4           = param4
-        msg.target_system    = 1
+        msg.command = command
+        msg.param1 = param1
+        msg.param2 = param2
+        msg.param3 = param3
+        msg.param4 = param4
+        msg.target_system = 1
         msg.target_component = 1
-        msg.source_system    = 1
+        msg.source_system = 1
         msg.source_component = 1
-        msg.from_external    = True
-        msg.timestamp        = self._us_now()
+        msg.from_external = True
+        msg.timestamp = self._us_now()
         self._pub_cmd.publish(msg)
 
     def _us_now(self) -> int:

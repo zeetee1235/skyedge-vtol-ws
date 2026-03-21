@@ -17,6 +17,8 @@
 | [ros2_study_links.md](ros2_study_links.md) | 신규 팀원 | ROS2·PX4·비전 학습 링크 모음 |
 | [git_basics.md](git_basics.md) | Git 입문자 | Git 기초 개념 및 하루 작업 흐름 |
 | [github_issues_guide.md](github_issues_guide.md) | 전체 | GitHub Issue 작성 방법 및 PR 연결 |
+| [tdd_guide.md](tdd_guide.md) | 구현 담당자 | 테스트를 읽고 구현하는 방법 |
+| [test_spec.md](test_spec.md) | 전체 | 현재 테스트 정책, 레이어 구조, 합격 기준 |
 
 > 협업 절차(브랜치 전략, PR 규칙)는 루트의 [CONTRIBUTING.md](../CONTRIBUTING.md)를 참고하세요.
 
@@ -39,6 +41,7 @@
 | HW / 통신 | architecture.md → docker.md |
 | 총괄 | architecture.md → docker.md → simulation.md |
 | 신규 팀원 | git_basics.md → github_issues_guide.md → ros2_study_links.md |
+| 테스트 처음 하는 팀원 | test_spec.md → tdd_guide.md |
 
 ---
 

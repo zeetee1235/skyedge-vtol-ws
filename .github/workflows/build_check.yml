@@ -58,6 +58,11 @@ jobs:
           ros2 pkg list | grep vtol
         shell: bash
 
+      - name: Python 테스트 실행
+        run: |
+          python3 -m unittest discover -s test -v
+        shell: bash
+
   docker_build:
     name: Docker 이미지 빌드 검증
     runs-on: ubuntu-22.04

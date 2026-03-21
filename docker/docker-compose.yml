@@ -29,11 +29,9 @@ services:
   xrce_agent:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/xrce_agent.Dockerfile
     profiles: [sim]
     network_mode: host
-    command: >
-      bash -c "MicroXRCEAgent udp4 -p 8888"
     depends_on:
       - px4_sitl
     restart: unless-stopped
