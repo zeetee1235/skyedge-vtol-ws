@@ -7,8 +7,9 @@ FROM ros:humble
 # 비대화형 설치
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 시스템 의존성 설치
-RUN apt-get update && apt-get install -y \
+# 시스템 의존성 설치 (재시도 로직 포함)
+RUN apt-get update -q || apt-get update -q || apt-get update -q && \
+    apt-get install -y -q --no-install-recommends \
     python3-pip \
     python3-colcon-common-extensions \
     python3-rosdep \
@@ -16,16 +17,13 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     vim \
-    # Micro XRCE-DDS Agent 빌드 도구
     cmake \
     g++ \
     build-essential \
-    # ROS2 패키지
     ros-humble-foxglove-bridge \
     ros-humble-vision-msgs \
     ros-humble-tf2-ros \
     ros-humble-cv-bridge \
-    # 시리얼 통신 (아두이노)
     python3-serial \
     && rm -rf /var/lib/apt/lists/*
 
