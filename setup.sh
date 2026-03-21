@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================
 # VTOL 워크스페이스 원클릭 셋업 스크립트
-# 대상 OS: Ubuntu 24.04 (ROS2 Jazzy)
+# 대상 OS: Ubuntu 22.04 (ROS2 Humble)
 # 사용법:  bash setup.sh
 # =============================================================
 set -euo pipefail
 
 VTOL_WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROS_DISTRO="jazzy"
+ROS_DISTRO="humble"
 
 info()  { echo -e "\e[32m[INFO]\e[0m  $*"; }
 warn()  { echo -e "\e[33m[WARN]\e[0m  $*"; }
@@ -24,11 +24,11 @@ fi
 info "시스템 패키지 업데이트 중..."
 $SUDO apt-get update -qq
 
-# ── 2. ROS2 Jazzy 설치 ────────────────────────────────────────
+# ── 2. ROS2 Humble 설치 ───────────────────────────────────────
 if ! command -v ros2 &>/dev/null; then
   info "ROS2 ${ROS_DISTRO} 설치 중..."
 
-  $SUDO apt-get install -y -qq locales curl gnupg lsb-release
+  $SUDO apt-get install -y -qq locales curl gnupg2 lsb-release software-properties-common
   $SUDO locale-gen en_US en_US.UTF-8
   $SUDO update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
   export LANG=en_US.UTF-8
@@ -63,7 +63,7 @@ $SUDO apt-get install -y -qq \
 
 # ── 4. Python 패키지 ──────────────────────────────────────────
 info "Python 패키지 설치 중..."
-pip3 install --break-system-packages -q \
+pip3 install -q \
   opencv-python \
   ultralytics \
   numpy \

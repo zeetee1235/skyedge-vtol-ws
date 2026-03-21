@@ -27,12 +27,12 @@ pkgs.mkShell {
     echo " VTOL 개발 환경 (Nix Shell)"
     echo "──────────────────────────────────────"
 
-    # ROS2 Jazzy 소싱 (apt 설치되어 있을 경우)
-    if [ -f /opt/ros/jazzy/setup.bash ]; then
-      source /opt/ros/jazzy/setup.bash
-      echo "[OK] ROS2 Jazzy sourced"
+    # ROS2 Humble 소싱 (apt 설치되어 있을 경우)
+    if [ -f /opt/ros/humble/setup.bash ]; then
+      source /opt/ros/humble/setup.bash
+      echo "[OK] ROS2 Humble sourced"
     else
-      echo "[WARN] ROS2 Jazzy not found at /opt/ros/jazzy"
+      echo "[WARN] ROS2 Humble not found at /opt/ros/humble"
       echo "       setup.sh 를 먼저 실행하거나 Docker를 사용하세요."
     fi
 

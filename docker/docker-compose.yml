@@ -22,7 +22,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix  # GUI (Gazebo)
     network_mode: host
     command: >
-      bash -c "source /opt/ros/jazzy/setup.bash &&
+      bash -c "source /opt/ros/humble/setup.bash &&
                source /vtol_ws/install/setup.bash &&
                ros2 launch vtol_bringup sim_launch.py"
 
@@ -42,20 +42,20 @@ services:
     volumes:
       - ../src:/vtol_ws/src
     command: >
-      bash -c "source /opt/ros/jazzy/setup.bash &&
+      bash -c "source /opt/ros/humble/setup.bash &&
                source /vtol_ws/install/setup.bash &&
                ros2 launch vtol_bringup real_launch.py"
 
   # ── Foxglove 브릿지 ──
   foxglove_bridge:
-    image: ros:jazzy
+    image: ros:humble
     network_mode: host
     environment:
       - ROS_DOMAIN_ID=0
     command: >
       bash -c "apt-get update -q &&
-               apt-get install -y ros-jazzy-foxglove-bridge &&
-               source /opt/ros/jazzy/setup.bash &&
+               apt-get install -y ros-humble-foxglove-bridge &&
+               source /opt/ros/humble/setup.bash &&
                ros2 run foxglove_bridge foxglove_bridge
                --ros-args -p port:=8765"
     ports:
