@@ -1,5 +1,6 @@
 # =============================================
 # VTOL 프로젝트 Docker Compose
+#
 # 시뮬: docker compose --profile sim up
 # 실기체: docker compose --profile real up
 # Foxglove만: docker compose up foxglove_bridge
@@ -7,7 +8,37 @@
 
 services:
 
-  # ── 시뮬레이션 환경 ──
+  # ── PX4 SITL + Gazebo Classic (headless) ──────────────────────────
+  # standard_vtol 기체 모델로 SITL 실행
+  # uXRCE-DDS 클라이언트가 내부적으로 xrce_agent(UDP 8888)에 연결함
+  px4_sitl:
+    image: jonasvautherin/px4-gazebo-headless:latest
+    profiles: [sim]
+    network_mode: host
+    environment:
+      - VEHICLE=standard_vtol
+      - PX4_HOME_LAT=37.5230
+      - PX4_HOME_LON=126.9830
+      - PX4_HOME_ALT=58.0
+      # uXRCE-DDS 네임스페이스 (ROS2 토픽: /drone1/fmu/...)
+      - PX4_UXRCE_DDS_NS=drone1
+    restart: unless-stopped
+
+  # ── Micro XRCE-DDS Agent (PX4 ↔ ROS2 브리지) ─────────────────────
+  # PX4 SITL이 UDP 8888로 연결 → ROS2 토픽으로 브리지
+  xrce_agent:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    profiles: [sim]
+    network_mode: host
+    command: >
+      bash -c "MicroXRCEAgent udp4 -p 8888"
+    depends_on:
+      - px4_sitl
+    restart: unless-stopped
+
+  # ── ROS2 노드 (시뮬레이션) ────────────────────────────────────────
   vtol_sim:
     build:
       context: ..
@@ -15,18 +46,19 @@ services:
     profiles: [sim]
     environment:
       - ROS_DOMAIN_ID=0
-      - PX4_SIM_MODEL=x500
-      - DISPLAY=${DISPLAY}
+      - DISPLAY=${DISPLAY:-}
     volumes:
       - ../src:/vtol_ws/src
-      - /tmp/.X11-unix:/tmp/.X11-unix  # GUI (Gazebo)
+      - /tmp/.X11-unix:/tmp/.X11-unix   # Foxglove GUI (선택)
     network_mode: host
     command: >
       bash -c "source /opt/ros/humble/setup.bash &&
                source /vtol_ws/install/setup.bash &&
                ros2 launch vtol_bringup sim_launch.py"
+    depends_on:
+      - xrce_agent
 
-  # ── 실기체 환경 ──
+  # ── ROS2 노드 (실기체) ────────────────────────────────────────────
   vtol_real:
     build:
       context: ..
@@ -46,7 +78,7 @@ services:
                source /vtol_ws/install/setup.bash &&
                ros2 launch vtol_bringup real_launch.py"
 
-  # ── Foxglove 브릿지 ──
+  # ── Foxglove 브릿지 ───────────────────────────────────────────────
   foxglove_bridge:
     image: ros:humble
     network_mode: host

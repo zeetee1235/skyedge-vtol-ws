@@ -16,6 +16,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     vim \
+    # Micro XRCE-DDS Agent 빌드 도구
+    cmake \
+    g++ \
+    build-essential \
     # ROS2 패키지
     ros-humble-foxglove-bridge \
     ros-humble-vision-msgs \
@@ -24,6 +28,16 @@ RUN apt-get update && apt-get install -y \
     # 시리얼 통신 (아두이노)
     python3-serial \
     && rm -rf /var/lib/apt/lists/*
+
+# Micro XRCE-DDS Agent (PX4 ↔ ROS2 UDP 브리지)
+RUN git clone --depth 1 --branch v2.4.2 \
+        https://github.com/eProsima/Micro-XRCE-DDS-Agent.git /tmp/xrce_agent \
+    && cmake -S /tmp/xrce_agent -B /tmp/xrce_agent/build \
+             -DCMAKE_BUILD_TYPE=Release \
+             -DCMAKE_INSTALL_PREFIX=/usr/local \
+    && cmake --build /tmp/xrce_agent/build --parallel "$(nproc)" \
+    && cmake --install /tmp/xrce_agent/build \
+    && rm -rf /tmp/xrce_agent
 
 # Python 패키지 설치
 RUN pip3 install \
