@@ -3,7 +3,9 @@
 [![Build Check](https://github.com/zeetee1235/skyedge-vtol-ws/actions/workflows/build_check.yml/badge.svg?branch=main)](https://github.com/zeetee1235/skyedge-vtol-ws/actions/workflows/build_check.yml)
 [![Python Lint Check](https://github.com/zeetee1235/skyedge-vtol-ws/actions/workflows/lint_check.yml/badge.svg?branch=main)](https://github.com/zeetee1235/skyedge-vtol-ws/actions/workflows/lint_check.yml)
 
-VTOL 기체(고정익 ↔ 호버링 전환)를 이용한 자율 임무 수행 시스템입니다.
+> **⚠️ NOTICE:** This repository is for **Paichai University SkyEdge Club members only**. Please do not create a pull request unless you are an active member of the SkyEdge club.
+
+VTOL 기체를 이용한 자율 임무 수행 시스템
 
 이 저장소는 ROS 2 Humble 기반의 워크스페이스이며, 비전 인식, 항법 제어, 정밀 착륙, 하드웨어 제어, 텔레메트리 기능을 패키지 단위로 나누어 관리합니다.
 
