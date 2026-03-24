@@ -84,6 +84,7 @@ def install() -> None:
     px4_msg.VehicleCommand        = _VehicleCommand
     px4_msg.OffboardControlMode   = _m
     px4_msg.TrajectorySetpoint    = _m
+    px4_msg.VehicleLandDetected   = _m
     px4_msg.VehicleLocalPosition  = _m
     sys.modules['px4_msgs']     = _m()
     sys.modules['px4_msgs.msg'] = px4_msg

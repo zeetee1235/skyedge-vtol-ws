@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 # 검증 대상 파일 경로
-TEST_SPEC    = ROOT / "docs" / "test_spec.md"
-SIM_LAUNCH   = ROOT / "src" / "vtol_bringup" / "launch" / "sim_launch.py"
-REAL_LAUNCH  = ROOT / "src" / "vtol_bringup" / "launch" / "real_launch.py"
+TEST_SPEC = ROOT / "docs" / "test_spec.md"
+SIM_LAUNCH = ROOT / "src" / "vtol_bringup" / "launch" / "sim_launch.py"
+REAL_LAUNCH = ROOT / "src" / "vtol_bringup" / "launch" / "real_launch.py"
 GLOBAL_PARAMS = ROOT / "src" / "vtol_bringup" / "config" / "global_params.yaml"
 WAYPOINT_NAV = ROOT / "src" / "vtol_control_nav" / "src" / "waypoint_nav_node.py"
 
@@ -30,7 +30,7 @@ class SpecContractTests(unittest.TestCase):
         spec = TEST_SPEC.read_text(encoding="utf-8")
 
         for case_id in ["TC-001", "TC-002", "TC-003",
-                         "TC-004", "TC-005", "TC-006", "TC-007"]:
+                        "TC-004", "TC-005", "TC-006", "TC-007"]:
             self.assertIn(case_id, spec)
 
     # ── 파라미터 파일 ──────────────────────────────────────────────
@@ -41,7 +41,7 @@ class SpecContractTests(unittest.TestCase):
 
         # 필수 키 존재 확인
         for key in ["use_sim: true", "takeoff_altitude:",
-                     "cruise_altitude:", "max_velocity:", "waypoints:"]:
+                    "cruise_altitude:", "max_velocity:", "waypoints:"]:
             self.assertIn(key, params)
 
         # waypoint 항목 2개 이상 ( - [x, y, z] 형식 )
@@ -56,7 +56,7 @@ class SpecContractTests(unittest.TestCase):
 
         # 시뮬에서 기동해야 하는 패키지 목록
         for pkg in ["vtol_control_nav", "vtol_control_task",
-                     "vtol_vision_yolo", "vtol_vision_aruco", "vtol_comm_lte"]:
+                    "vtol_vision_yolo", "vtol_vision_aruco", "vtol_comm_lte"]:
             self.assertIn(f"package='{pkg}'", launch_text)
 
         # DDS 에이전트 준비 대기용 지연 액션
@@ -74,8 +74,8 @@ class SpecContractTests(unittest.TestCase):
 
         # 실기체에서 기동해야 하는 패키지 목록 (그리퍼 포함)
         for pkg in ["vtol_control_nav", "vtol_control_task",
-                     "vtol_vision_yolo", "vtol_vision_aruco",
-                     "vtol_hw_gripper", "vtol_comm_lte"]:
+                    "vtol_vision_yolo", "vtol_vision_aruco",
+                    "vtol_hw_gripper", "vtol_comm_lte"]:
             self.assertIn(f"package='{pkg}'", launch_text)
 
         # 실기체 모드 플래그
@@ -83,35 +83,29 @@ class SpecContractTests(unittest.TestCase):
 
     # ── waypoint 내비게이션 노드 ───────────────────────────────────
 
-    def test_waypoint_nav_has_takeoff_navigate_and_land_flow(self):
-        """waypoint_nav_node.py 에 전체 상태 머신과 핵심 명령 메서드가 있어야 한다"""
+    def test_waypoint_nav_has_expanded_vtol_state_machine(self):
+        """waypoint_nav_node.py 에 확장된 VTOL 상태 머신과 핵심 명령 메서드가 있어야 한다"""
         nav_code = WAYPOINT_NAV.read_text(encoding="utf-8")
 
-        # 상태 머신 상태 6개
-        for state in ["_IDLE", "_ARMING", "_TAKEOFF", "_NAVIGATE", "_LAND", "_DONE"]:
+        for state in [
+            "_IDLE", "_ARMING", "_TAKEOFF", "_TRANSITION_TO_FW",
+            "_NAVIGATE", "_TRANSITION_TO_MC", "_LAND", "_LANDING_CONFIRM", "_DONE",
+        ]:
             self.assertIn(state, nav_code)
 
-        # 핵심 명령 메서드 호출
         self.assertIn("self._cmd_arm()", nav_code)
         self.assertIn("self._cmd_set_offboard_mode()", nav_code)
+        self.assertIn("self._cmd_vtol_to_fw()", nav_code)
+        self.assertIn("self._cmd_vtol_to_mc()", nav_code)
         self.assertIn("self._cmd_land()", nav_code)
-        self.assertIn("self._send_setpoint(*wp)", nav_code)
 
-    def test_waypoint_nav_defines_multiple_waypoints(self):
-        """waypoint_nav_node.py 에 (x, y, z) 튜플이 2개 이상 정의되어 있어야 한다"""
+    def test_waypoint_nav_uses_parameterized_waypoints(self):
+        """waypoint_nav_node.py 가 vtol.waypoints 파라미터를 선언/사용해야 한다"""
         nav_code = WAYPOINT_NAV.read_text(encoding="utf-8")
 
-        # self._waypoints: list[tuple[float, float, float]] = [...] 블록 추출
-        waypoint_block_match = re.search(
-            r"self\._waypoints: list\[tuple\[float, float, float\]\] = \[(.*?)\]",
-            nav_code,
-            flags=re.DOTALL,
-        )
-        self.assertIsNotNone(waypoint_block_match, "waypoints 리스트 정의를 찾을 수 없음")
-
-        waypoint_block = waypoint_block_match.group(1)
-        tuple_count = len(re.findall(r"\([^()]+\)", waypoint_block))
-        self.assertGreaterEqual(tuple_count, 2, "waypoint 가 2개 미만임")
+        self.assertIn("declare_parameter('vtol.waypoints'", nav_code)
+        self.assertIn("_reload_mission_from_params", nav_code)
+        self.assertIn("MissionPlanner", nav_code)
 
 
 if __name__ == "__main__":

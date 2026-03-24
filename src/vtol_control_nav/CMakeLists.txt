@@ -9,4 +9,11 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(DIRECTORY
+  src/trajectory_planners
+  src/precision_landing
+  src/mission_executor
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

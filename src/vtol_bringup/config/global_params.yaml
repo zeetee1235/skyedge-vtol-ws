@@ -13,13 +13,47 @@ vtol:
   landing_descent_altitude: 3.0   # 정밀 착륙 시작 고도 (m)
   max_velocity: 15.0               # 최대 속도 (m/s)
 
-  # GPS 목표 좌표 (향후 GPS → local 변환 로직 연결 예정)
-  # 현재 waypoint_nav_node 는 아래 값을 직접 사용하지 않고,
-  # 노드 내부의 NED local waypoint 예시를 사용합니다.
-  # 초보자는 이 값을 수정해도 현재 비행 경로가 바로 바뀌지 않는다는 점에 주의하세요.
+  # waypoint 입력 프레임: gps | local_ned
+  waypoint_frame: "gps"
+
+  # 동적 waypoint 리로드 (ROS 파라미터 값 재반영)
+  dynamic_waypoint_update: true
+  dynamic_reload_period_sec: 1.0
+
+  # waypoint 도달/전환/장애 판정 파라미터
+  waypoint_reached_threshold: 2.0
+  transition_timeout_sec: 8.0
+  waypoint_unreachable_timeout_sec: 45.0
+  comm_loss_timeout_sec: 2.0
+  gps_error_failsafe: true
+
+  # waypoint_nav_node가 아래 waypoint를 직접 사용합니다.
+  # waypoint_frame=gps 인 경우 [lat, lon, alt_m],
+  # waypoint_frame=local_ned 인 경우 [north_m, east_m, down_m] 형식입니다.
   waypoints:
     - [37.123456, 127.123456, 30.0]
     - [37.234567, 127.234567, 30.0]
+
+  # Trajectory planner 선택
+  # 신규: trajectory.type, 하위호환: trajectory_mode
+  trajectory:
+    type: "smoothstep"             # point_jump | linear | smoothstep | mpc
+  trajectory_mode: "smoothstep"
+  trajectory_max_step_m: 2.0
+
+  # MPC planner stub 파라미터 (trajectory.type=mpc 시 사용)
+  mpc:
+    horizon_steps: 15
+    dt: 0.1
+    w_pos: 1.0
+    w_vel: 0.2
+    w_u: 0.05
+
+  # LANDING_CONFIRM 판정 파라미터
+  landing_confirm_alt_threshold: 0.4
+  landing_confirm_speed_threshold: 0.5
+  landing_confirm_hold_sec: 1.0
+  landing_confirm_use_kinematic_fallback: false
 
   # 비전
   aruco_marker_id: 0               # 착륙 지점 ArUco 마커 ID
