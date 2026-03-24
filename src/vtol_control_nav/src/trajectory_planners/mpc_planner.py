@@ -45,11 +45,11 @@ def _mat_mul(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
     for i in range(m):
         Ai = A[i]
         Ci = C[i]
-        for l in range(k):
-            a = Ai[l]
+        for idx in range(k):
+            a = Ai[idx]
             if a == 0.0:
                 continue
-            Bl = B[l]
+            Bl = B[idx]
             for j in range(n):
                 Ci[j] += a * Bl[j]
     return C
@@ -131,10 +131,10 @@ def _build_mpc_gain(
                 Gamma[2 * k + r][j] = ab[r][0]
 
     # Q̄ 대각 원소 (길이 2N):  위치 행 → w_pos,  속도 행 → w_vel
-    q_diag = [w_pos if (l % 2 == 0) else w_vel for l in range(two_N)]
+    q_diag = [w_pos if (row % 2 == 0) else w_vel for row in range(two_N)]
 
-    # GᵀQ̄ (N×2N):  GtQ[i][l] = Gamma[l][i] * q_diag[l]
-    GtQ = [[Gamma[l][i] * q_diag[l] for l in range(two_N)] for i in range(N)]
+    # GᵀQ̄ (N×2N):  GtQ[i][row] = Gamma[row][i] * q_diag[row]
+    GtQ = [[Gamma[row][i] * q_diag[row] for row in range(two_N)] for i in range(N)]
 
     # H = GᵀQ̄·Gamma + R̄  (N×N),  R̄ = w_u · I
     H = _zeros(N, N)
@@ -142,8 +142,8 @@ def _build_mpc_gain(
         GtQi = GtQ[i]
         for j in range(N):
             s = 0.0
-            for l in range(two_N):
-                s += GtQi[l] * Gamma[l][j]
+            for row in range(two_N):
+                s += GtQi[row] * Gamma[row][j]
             H[i][j] = s
         H[i][i] += w_u
 
@@ -153,8 +153,8 @@ def _build_mpc_gain(
         GtQi = GtQ[i]
         for c in range(2):
             s = 0.0
-            for l in range(two_N):
-                s += GtQi[l] * Phi[l][c]
+            for row in range(two_N):
+                s += GtQi[row] * Phi[row][c]
             GtQPhi[i][c] = s
 
     # F = H⁻¹ · GᵀQ̄·Phi  (N×2)
@@ -205,12 +205,12 @@ class MPCPlanner(BaseTrajectoryPlanner):
     def update_config(self, **kwargs) -> None:
         changed = False
         spec = [
-            ('_max_step_m', 'max_step_m',    lambda v: max(0.1,  float(v))),
-            ('_N',          'horizon_steps', lambda v: max(2,    int(v))),
-            ('_dt',         'dt',            lambda v: max(0.02, float(v))),
-            ('_w_pos',      'w_pos',         lambda v: max(0.0,  float(v))),
-            ('_w_vel',      'w_vel',         lambda v: max(0.0,  float(v))),
-            ('_w_u',        'w_u',           lambda v: max(1e-6, float(v))),
+            ('_max_step_m', 'max_step_m', lambda v: max(0.1, float(v))),
+            ('_N', 'horizon_steps', lambda v: max(2, int(v))),
+            ('_dt', 'dt', lambda v: max(0.02, float(v))),
+            ('_w_pos', 'w_pos', lambda v: max(0.0, float(v))),
+            ('_w_vel', 'w_vel', lambda v: max(0.0, float(v))),
+            ('_w_u', 'w_u', lambda v: max(1e-6, float(v))),
         ]
         for attr, key, clamp in spec:
             if key in kwargs:
