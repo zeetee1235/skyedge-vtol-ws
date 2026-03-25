@@ -19,8 +19,14 @@ SIM_RUNNING = os.getenv('SIM_RUNNING', '0') == '1'
 class TestTC003Takeoff(unittest.TestCase):
     """TC-003: 기체가 지정 고도까지 자동 이륙 가능한지 검증"""
 
-    TOPIC_VEHICLE_STATUS   = '/drone1/fmu/out/vehicle_status'
-    TOPIC_LOCAL_POSITION   = '/drone1/fmu/out/vehicle_local_position'
+    TOPIC_VEHICLE_STATUS_CANDIDATES = [
+        '/drone1/fmu/out/vehicle_status',
+        '/drone1/fmu/out/vehicle_status_v1',
+    ]
+    TOPIC_LOCAL_POSITION_CANDIDATES = [
+        '/drone1/fmu/out/vehicle_local_position',
+        '/drone1/fmu/out/vehicle_local_position_v1',
+    ]
     TOPIC_OFFBOARD_MODE    = '/drone1/fmu/in/offboard_control_mode'
     TAKEOFF_ALTITUDE_M     = 5.0
     ALTITUDE_TOLERANCE_M   = 0.5
@@ -44,13 +50,17 @@ class TestTC003Takeoff(unittest.TestCase):
 
     def test_vehicle_status_topic_active(self):
         topics = self._ros2_topic_list()
-        self.assertIn(self.TOPIC_VEHICLE_STATUS, topics,
-                      "vehicle_status 토픽 없음")
+        self.assertTrue(
+            any(topic in topics for topic in self.TOPIC_VEHICLE_STATUS_CANDIDATES),
+            "vehicle_status 토픽 없음 (vehicle_status or vehicle_status_v1)",
+        )
 
     def test_local_position_topic_active(self):
         topics = self._ros2_topic_list()
-        self.assertIn(self.TOPIC_LOCAL_POSITION, topics,
-                      "vehicle_local_position 토픽 없음")
+        self.assertTrue(
+            any(topic in topics for topic in self.TOPIC_LOCAL_POSITION_CANDIDATES),
+            "vehicle_local_position 토픽 없음 (vehicle_local_position or vehicle_local_position_v1)",
+        )
 
     def test_ros2_nodes_running(self):
         """vtol ROS2 노드들이 실행 중인지 확인"""

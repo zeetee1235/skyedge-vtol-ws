@@ -76,6 +76,18 @@ class MissionPlanner:
             return parsed
 
         for item in raw_waypoints:
+            # ROS2 파라미터 제약(중첩 배열 미지원)을 위해 "x,y,z" 문자열도 허용
+            if isinstance(item, str):
+                parts = [p.strip() for p in item.split(',')]
+                if len(parts) != 3:
+                    continue
+                try:
+                    x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+                except (TypeError, ValueError):
+                    continue
+                parsed.append((x, y, z))
+                continue
+
             if not isinstance(item, (list, tuple)) or len(item) != 3:
                 continue
             try:
@@ -196,11 +208,15 @@ class WaypointNavNode(Node):
 
         # ── 파라미터 ─────────────────────────────────────────────
         self.declare_parameter('vtol.drone_id', 'drone1')
+        self.declare_parameter('vtol.use_sim', True)
         self.declare_parameter('vtol.takeoff_altitude', 5.0)
         self.declare_parameter('vtol.cruise_altitude', 30.0)
+        self.declare_parameter('vtol.max_altitude_m', 40.0)
+        self.declare_parameter('vtol.takeoff_timeout_sec', 35.0)
 
         self.declare_parameter('vtol.waypoint_frame', 'gps')
-        self.declare_parameter('vtol.waypoints', [])
+        # ROS2 파라미터 타입 추론 이슈를 피하기 위해 문자열 배열 기본값 사용
+        self.declare_parameter('vtol.waypoints', ['0.0,0.0,30.0'])
         self.declare_parameter('vtol.dynamic_waypoint_update', True)
         self.declare_parameter('vtol.dynamic_reload_period_sec', 1.0)
 
@@ -230,11 +246,17 @@ class WaypointNavNode(Node):
 
         # 기본 파라미터 로드
         drone_id = self.get_parameter('vtol.drone_id').value
+        self._use_sim = bool(self.get_parameter('vtol.use_sim').value)
         takeoff_alt = float(self.get_parameter('vtol.takeoff_altitude').value)
         cruise_alt = float(self.get_parameter('vtol.cruise_altitude').value)
+        max_alt_m = float(self.get_parameter('vtol.max_altitude_m').value)
 
         self._takeoff_z = -abs(takeoff_alt)
         self._cruise_z = -abs(cruise_alt)
+        self._max_alt_z = -abs(max_alt_m)
+        # 이륙/순항 목표도 최대 고도 제한을 넘지 않도록 초기값부터 클램프
+        self._takeoff_z = max(self._takeoff_z, self._max_alt_z)
+        self._cruise_z = max(self._cruise_z, self._max_alt_z)
 
         self._wp_reached_thr = float(self.get_parameter('vtol.waypoint_reached_threshold').value)
         self._landing_alt_thr = float(self.get_parameter('vtol.landing_confirm_alt_threshold').value)
@@ -252,6 +274,8 @@ class WaypointNavNode(Node):
         self._comm_loss_timeout_sec = float(self.get_parameter('vtol.comm_loss_timeout_sec').value)
 
         self._transition_timeout_cycles = max(1, int(math.ceil(transition_timeout_sec / self._CTRL_DT)))
+        takeoff_timeout_sec = float(self.get_parameter('vtol.takeoff_timeout_sec').value)
+        self._takeoff_timeout_cycles = max(1, int(math.ceil(takeoff_timeout_sec / self._CTRL_DT)))
         self._landing_confirm_required_cycles = max(
             1,
             int(math.ceil(landing_confirm_hold_sec / self._CTRL_DT)),
@@ -303,13 +327,13 @@ class WaypointNavNode(Node):
         # ── Subscribers ───────────────────────────────────────────
         self.create_subscription(
             VehicleStatus,
-            f'{ns}/fmu/out/vehicle_status',
+            f'{ns}/fmu/out/vehicle_status_v1',
             self._cb_status,
             _PX4_QOS,
         )
         self.create_subscription(
             VehicleLocalPosition,
-            f'{ns}/fmu/out/vehicle_local_position',
+            f'{ns}/fmu/out/vehicle_local_position_v1',
             self._cb_local_pos,
             _PX4_QOS,
         )
@@ -327,7 +351,10 @@ class WaypointNavNode(Node):
 
         self._state = self._IDLE
         self._pre_arm_cnt = 0
+        self._arming_retry_cnt = 0
+        self._arm_keepalive_cnt = 0
         self._transition_wait_cnt = 0
+        self._takeoff_hold_cnt = 0
         self._landing_confirm_cnt = 0
         self._wp_progress_cnt = 0
 
@@ -472,6 +499,16 @@ class WaypointNavNode(Node):
         self._loop_cnt += 1
         self._sync_runtime_updates()
 
+        # SITL에서는 preflight 제약으로 간헐적 자동 disarm이 발생할 수 있어 arm 유지 재시도
+        if self._use_sim and self._state not in (self._IDLE, self._DONE, self._LANDING_CONFIRM):
+            self._arm_keepalive_cnt += 1
+            if self._status.arming_state != VehicleStatus.ARMING_STATE_ARMED and self._arm_keepalive_cnt % 20 == 0:
+                self._cmd_arm()
+                self._cmd_set_offboard_mode()
+                self.get_logger().warn(
+                    f'ARM keepalive 재시도 (state={self._state}, arming_state={self._status.arming_state})',
+                )
+
         if self._check_faults_and_enter_failsafe():
             return
 
@@ -490,12 +527,17 @@ class WaypointNavNode(Node):
             self._enter_failsafe('gps_error')
             return True
 
-        if self._seen_status and (self._loop_cnt - self._last_status_loop) > self._comm_loss_timeout_cycles:
-            self._enter_failsafe('status_timeout')
-            return True
+        status_stale = self._seen_status and (
+            (self._loop_cnt - self._last_status_loop) > self._comm_loss_timeout_cycles
+        )
+        local_pos_stale = self._seen_local_pos and (
+            (self._loop_cnt - self._last_local_pos_loop) > self._comm_loss_timeout_cycles
+        )
 
-        if self._seen_local_pos and (self._loop_cnt - self._last_local_pos_loop) > self._comm_loss_timeout_cycles:
-            self._enter_failsafe('local_pos_timeout')
+        # 단일 토픽 일시 끊김(특히 status)에는 즉시 failsafe 진입하지 않고,
+        # 핵심 텔레메트리(status+local_position) 모두가 끊겼을 때만 진입한다.
+        if status_stale and local_pos_stale:
+            self._enter_failsafe('telemetry_timeout')
             return True
 
         return False
@@ -515,6 +557,7 @@ class WaypointNavNode(Node):
         if self._pre_arm_cnt >= 10:
             self._cmd_arm()
             self._cmd_set_offboard_mode()
+            self._arming_retry_cnt = 0
             self._state = self._ARMING
             self.get_logger().info('→ ARMING')
 
@@ -522,13 +565,31 @@ class WaypointNavNode(Node):
         self._send_offboard_mode()
         self._send_setpoint(0.0, 0.0, self._takeoff_z)
         if self._status.arming_state == VehicleStatus.ARMING_STATE_ARMED:
+            self._takeoff_hold_cnt = 0
             self._state = self._TAKEOFF
             self.get_logger().info('→ TAKEOFF')
+            return
+
+        # PX4 preflight 조건이 늦게 충족되는 경우를 대비해 ARM/OFFBOARD를 주기 재시도
+        self._arming_retry_cnt += 1
+        if self._arming_retry_cnt % 20 == 0:  # 2초 간격
+            self._cmd_arm()
+            self._cmd_set_offboard_mode()
+            self.get_logger().warn(
+                'ARMING 재시도: 아직 ARMED 아님 '
+                f'(arming_state={self._status.arming_state}, '
+                f'pre_flight_checks_pass={getattr(self._status, "pre_flight_checks_pass", False)})',
+            )
 
     def _handle_takeoff(self) -> None:
         self._send_offboard_mode()
         self._send_setpoint(0.0, 0.0, self._takeoff_z)
-        if self._reached(0.0, 0.0, self._takeoff_z, thr=0.5):
+        self._takeoff_hold_cnt += 1
+        reached_takeoff = self._reached(0.0, 0.0, self._takeoff_z, thr=1.0)
+        timeout_takeoff = self._takeoff_hold_cnt >= self._takeoff_timeout_cycles
+        if reached_takeoff or timeout_takeoff:
+            if timeout_takeoff and not reached_takeoff:
+                self.get_logger().warn('TAKEOFF 고도 도달 확인 타임아웃. 고정익 전환을 시도합니다.')
             self._cmd_vtol_to_fw()
             self._transition_wait_cnt = 0
             self._state = self._TRANSITION_TO_FW
@@ -707,7 +768,9 @@ class WaypointNavNode(Node):
 
     def _send_setpoint(self, x: float, y: float, z: float, yaw: float = 0.0) -> None:
         msg = TrajectorySetpoint()
-        msg.position = [x, y, z]
+        # NED 기준 z는 음수일수록 고도가 높다. 최대고도(max_altitude_m) 초과 상승 방지.
+        z_clamped = max(z, self._max_alt_z)
+        msg.position = [x, y, z_clamped]
         msg.yaw = yaw
         msg.timestamp = self._us_now()
         self._pub_setpoint.publish(msg)
@@ -715,7 +778,13 @@ class WaypointNavNode(Node):
     # ── VehicleCommand ────────────────────────────────────────────
 
     def _cmd_arm(self) -> None:
-        self._send_cmd(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
+        # SITL 데모 환경에서는 preflight 미통과 시에도 강제 arm을 허용해 자동 비행을 진행
+        force_code = 21196.0 if self._use_sim else 0.0
+        self._send_cmd(
+            VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
+            param1=1.0,
+            param2=force_code,
+        )
 
     def _cmd_set_offboard_mode(self) -> None:
         self._send_cmd(

@@ -6,6 +6,7 @@ find_package(rclpy REQUIRED)
 
 install(PROGRAMS
   src/telemetry_node.py
+  RENAME telemetry_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

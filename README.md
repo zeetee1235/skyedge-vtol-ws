@@ -226,6 +226,7 @@ git push -u origin feature/<작업이름>
 | 문서 | 내용 |
 |------|------|
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 브랜치 전략, PR 작업 절차 |
+| [docs/vtol_demo_quickstart.md](docs/vtol_demo_quickstart.md) | VTOL 데모를 처음부터 끝까지 실행하는 명령어 모음 |
 | [docs/architecture.md](docs/architecture.md) | 패키지 구조, 토픽 목록, PX4 통신 구조 |
 | [docs/simulation.md](docs/simulation.md) | PX4 + Gazebo 시뮬 실행 방법 |
 | [docs/docker.md](docs/docker.md) | Docker Compose 서비스 구성 및 사용법 |

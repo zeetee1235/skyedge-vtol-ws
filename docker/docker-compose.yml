@@ -1,37 +1,36 @@
 # =============================================
 # VTOL 프로젝트 Docker Compose
 #
-# 시뮬: docker compose --profile sim up
-# 실기체: docker compose --profile real up
-# Foxglove만: docker compose up foxglove_bridge
+# 권장 실행 방법:
+#   ./sim.sh          # headless
+#   ./sim.sh --gui    # Gazebo GUI 포함
+#   ./sim.sh --down   # 종료
 # =============================================
 
 services:
 
-  # ── PX4 SITL + Gazebo Classic (headless) ──────────────────────────
-  # standard_vtol 기체 모델로 SITL 실행
-  # uXRCE-DDS 클라이언트가 내부적으로 xrce_agent(UDP 8888)에 연결함
+  # ── PX4 SITL + Gazebo Sim (headless) ──────────────────────────────
+  # standard_vtol 기체 모델, PX4 uXRCE-DDS → xrce_agent(UDP 8888) 연결
   px4_sitl:
     image: jonasvautherin/px4-gazebo-headless:latest
     profiles: [sim]
     network_mode: host
+    command: ["-v", "gz_standard_vtol"]
     environment:
-      - VEHICLE=standard_vtol
       - PX4_HOME_LAT=37.5230
       - PX4_HOME_LON=126.9830
       - PX4_HOME_ALT=58.0
-      # uXRCE-DDS 네임스페이스 (ROS2 토픽: /drone1/fmu/...)
       - PX4_UXRCE_DDS_NS=drone1
     restart: unless-stopped
 
   # ── Micro XRCE-DDS Agent (PX4 ↔ ROS2 브리지) ─────────────────────
-  # PX4 SITL이 UDP 8888로 연결 → ROS2 토픽으로 브리지
   xrce_agent:
     build:
       context: ..
       dockerfile: docker/xrce_agent.Dockerfile
     profiles: [sim]
     network_mode: host
+    command: ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && MicroXRCEAgent udp4 -p 8888"]
     depends_on:
       - px4_sitl
     restart: unless-stopped
@@ -47,14 +46,39 @@ services:
       - DISPLAY=${DISPLAY:-}
     volumes:
       - ../src:/vtol_ws/src
-      - /tmp/.X11-unix:/tmp/.X11-unix   # Foxglove GUI (선택)
+      - /tmp/.X11-unix:/tmp/.X11-unix
     network_mode: host
     command: >
       bash -c "source /opt/ros/humble/setup.bash &&
+               for pkg in vtol_control_nav vtol_control_task vtol_comm_lte vtol_vision_aruco vtol_vision_yolo; do
+                 for f in /vtol_ws/src/$$pkg/src/*_node.py; do
+                   [ -f \"$$f\" ] || continue;
+                   dst=/vtol_ws/install/$$pkg/lib/$$pkg/$$(basename $$f .py);
+                   [ -f \"$$dst\" ] && cp \"$$f\" \"$$dst\" && chmod +x \"$$dst\";
+                 done;
+               done &&
                source /vtol_ws/install/setup.bash &&
                ros2 launch vtol_bringup sim_launch.py"
     depends_on:
       - xrce_agent
+
+  # ── Gazebo GUI ────────────────────────────────────────────────────
+  # ./sim.sh --gui 로 실행 시 자동으로 px4_sitl 서버에 붙음
+  # 소프트웨어 렌더링(LIBGL_ALWAYS_SOFTWARE) 사용 — GPU 드라이버 불필요
+  gzclient:
+    image: jonasvautherin/px4-gazebo-headless:latest
+    profiles: [sim]
+    network_mode: host
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - MESA_GL_VERSION_OVERRIDE=3.3
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    entrypoint: ["gz", "sim", "-g"]
+    depends_on:
+      - px4_sitl
 
   # ── ROS2 노드 (실기체) ────────────────────────────────────────────
   vtol_real:
@@ -63,10 +87,10 @@ services:
       dockerfile: docker/Dockerfile
     profiles: [real]
     network_mode: host
-    privileged: true          # 시리얼 포트 접근 필요
+    privileged: true
     devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0   # 아두이노 시리얼
-      - /dev/ttyACM0:/dev/ttyACM0   # PX4 시리얼
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyACM0:/dev/ttyACM0
     environment:
       - ROS_DOMAIN_ID=0
     volumes:

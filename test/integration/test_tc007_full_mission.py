@@ -18,18 +18,19 @@ SIM_RUNNING = os.getenv('SIM_RUNNING', '0') == '1'
 class TestTC007FullMission(unittest.TestCase):
     """TC-007: 이륙 → 웨이포인트 → 착륙 전체 흐름 검증"""
 
-    def _topic_hz(self, topic: str, duration: int = 3) -> float:
+    def _topic_hz(self, topic: str, duration: int = 3, retries: int = 3) -> float:
         """topic의 publish 주파수를 측정해 반환 (Hz)"""
-        result = subprocess.run(
-            ['ros2', 'topic', 'hz', topic, '--window', '10'],
-            capture_output=True, text=True, timeout=duration + 5,
-        )
-        for line in result.stdout.splitlines():
-            if 'average rate' in line:
-                try:
-                    return float(line.split(':')[1].strip().split()[0])
-                except (IndexError, ValueError):
-                    pass
+        for _ in range(retries):
+            result = subprocess.run(
+                ['timeout', str(duration + 6), 'ros2', 'topic', 'hz', topic, '--window', '10'],
+                capture_output=True, text=True,
+            )
+            for line in result.stdout.splitlines():
+                if 'average rate' in line:
+                    try:
+                        return float(line.split(':')[1].strip().split()[0])
+                    except (IndexError, ValueError):
+                        pass
         return 0.0
 
     def test_offboard_setpoint_publishing(self):

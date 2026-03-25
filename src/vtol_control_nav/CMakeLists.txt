@@ -6,6 +6,7 @@ find_package(rclpy REQUIRED)
 
 install(PROGRAMS
   src/waypoint_nav_node.py
+  RENAME waypoint_nav_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
