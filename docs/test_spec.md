@@ -1,4 +1,4 @@
-# 테스트 명세서 v0.1.0
+# 테스트 명세서 v0.2.0
 
 > VTOL 드론 프로젝트 — Gazebo 시뮬레이션 기반 초기 검증 기준 문서
 
@@ -12,7 +12,8 @@
 
 ```bash
 python3 -m unittest discover -s test -v
-# 기대: contract PASS + waypoint_nav PASS + 나머지 skip (빨간색 없음)
+# 기대: 76개 실행, 17개 skip, 빨간색 없음
+# contract PASS + waypoint_nav(59개) PASS + vision skip
 ```
 
 ---
@@ -115,21 +116,50 @@ test/
 | TestInit | `test_subscribes_vehicle_status` | vehicle_status_v1 구독 존재 |
 | TestInit | `test_subscribes_vehicle_local_position` | vehicle_local_position_v1 구독 존재 |
 | TestInit | `test_takeoff_z_is_negative_ned` | `_takeoff_z < 0` (NED 상향 = 음수) |
-| TestWaypointParsing | `test_parse_waypoints_filters_invalid_entries` | 잘못된 항목 필터링 |
-| TestWaypointParsing | `test_gps_conversion_sets_first_waypoint_origin` | GPS → NED 변환 |
-| TestMissionPlanner | `test_invalid_gps_filtered` | 유효하지 않은 GPS 필터링 |
+| TestInit | `test_waypoints_loaded` | 웨이포인트 1개 이상 로드, 전부 NED z < 0 |
+| TestWaypointParsing | `test_parse_waypoints_filters_invalid_entries` | 잘못된 배열 항목 필터링 |
+| TestWaypointParsing | `test_parse_waypoints_handles_string_format` | `"x,y,z"` 문자열 형식 파싱 |
+| TestWaypointParsing | `test_parse_waypoints_filters_invalid_string` | 잘못된 문자열 필터링 |
+| TestWaypointParsing | `test_parse_waypoints_mixed_string_and_array` | 문자열·배열 혼합 파싱 |
+| TestWaypointParsing | `test_gps_conversion_sets_first_waypoint_origin` | GPS → NED 변환, 첫 점 = 원점 |
+| TestMissionPlanner | `test_invalid_gps_filtered` | 범위 초과 GPS 필터링 + gps_error 플래그 |
+| TestMissionPlanner | `test_empty_waypoints_returns_default` | 빈 웨이포인트 → 기본 목표 반환 |
+| TestMissionPlanner | `test_local_ned_z_forced_negative` | local_ned 프레임 z 음수 강제 변환 |
+| TestTrajectoryPlanner | `test_point_jump_returns_target` | point_jump: 즉시 목표 반환 |
+| TestTrajectoryPlanner | `test_linear_limits_step` | linear: 스텝 상한 준수 |
+| TestTrajectoryPlanner | `test_mpc_moves_toward_target_bounded` | mpc: 목표 방향 이동 + 상한 준수 |
 | TestReached | `test_true_when_at_target` | 목표 도달 시 True |
 | TestReached | `test_false_when_far` | 멀리 있을 때 False |
+| TestReached | `test_boundary_exactly_at_threshold` | 거리 == threshold → False (strictly less) |
+| TestStateMachine | `test_state_handler_map_has_core_states` | 핵심 상태 핸들러 등록 확인 |
 | TestStateMachine | `test_stays_idle_before_10_cycles` | 10회 미만 → IDLE 유지 |
 | TestStateMachine | `test_transitions_to_arming_after_10_cycles` | 10회 후 → ARMING |
 | TestStateMachine | `test_transitions_to_takeoff_when_armed` | ARMED → TAKEOFF |
+| TestStateMachine | `test_arming_retry_sends_arm_command` | ARMING 20사이클마다 ARM 명령 재전송 |
+| TestStateMachine | `test_arming_no_retry_before_20_cycles` | 20사이클 미만에서는 재전송 없음 |
 | TestStateMachine | `test_takeoff_goes_to_transition_to_fw` | 이륙 고도 도달 → TRANSITION_TO_FW |
+| TestStateMachine | `test_takeoff_timeout_goes_to_transition_to_fw` | 이륙 타임아웃 → TRANSITION_TO_FW 강제 전환 |
 | TestStateMachine | `test_transition_to_fw_goes_to_navigate_on_timeout` | FW 전환 타임아웃 → NAVIGATE |
 | TestStateMachine | `test_transitions_to_mc_after_last_waypoint` | 마지막 WP 도달 → TRANSITION_TO_MC |
 | TestStateMachine | `test_transition_to_mc_goes_to_land_on_timeout` | MC 전환 타임아웃 → LAND |
-| TestStateMachine | `test_comm_loss_enters_failsafe` | 통신 두절 → FAILSAFE_LAND |
+| TestStateMachine | `test_land_goes_to_landing_confirm` | LAND → LANDING_CONFIRM |
+| TestStateMachine | `test_landing_confirm_goes_to_done_when_disarmed` | LANDING_CONFIRM → DONE |
+| TestStateMachine | `test_comm_loss_enters_failsafe` | status + local_pos 모두 두절 → FAILSAFE_LAND |
+| TestStateMachine | `test_single_topic_loss_does_not_enter_failsafe` | 단일 토픽 끊김은 failsafe 미진입 |
+| TestStateMachine | `test_waypoint_unreachable_skips_waypoint` | WP 타임아웃 → 다음 WP 스킵 |
+| TestLandingCondition | `test_is_landed_by_low_alt_and_speed` | 저고도 + 저속 → 착지 판정 |
+| TestLandingCondition | `test_not_landed_when_fast` | 고속 비행 중 → 착지 미판정 |
+| TestLandingCondition | `test_not_landed_on_low_hover_by_default` | kinematic fallback 비활성 시 미판정 |
+| TestLandingCondition | `test_is_landed_when_standby` | ARMING_STATE_STANDBY(disarm) → 착지 판정 |
+| TestSITLBehavior | `test_force_arm_param2_in_sim` | 시뮬 모드: ARM param2 = 21196.0 (강제 ARM) |
+| TestSITLBehavior | `test_no_force_arm_without_sim` | 비시뮬 모드: ARM param2 = 0.0 |
+| TestSITLBehavior | `test_arm_keepalive_fires_when_disarmed_in_navigate` | SITL: NAVIGATE 중 비armed 시 keepalive 발동 |
+| TestSITLBehavior | `test_arm_keepalive_skipped_in_idle` | IDLE 상태에서는 keepalive 스킵 |
+| TestSITLBehavior | `test_arm_keepalive_skipped_when_already_armed` | 이미 armed 시 keepalive 스킵 |
 | TestVTOLCommands | `test_vtol_to_fw_callable` | `_cmd_vtol_to_fw()` 존재 |
 | TestVTOLCommands | `test_vtol_to_mc_callable` | `_cmd_vtol_to_mc()` 존재 |
+| TestVTOLCommands | `test_vtol_to_fw_sends_param1_4` | FW 전환 명령 param1 = 4.0 |
+| TestVTOLCommands | `test_vtol_to_mc_sends_param1_3` | MC 전환 명령 param1 = 3.0 |
 
 ---
 
